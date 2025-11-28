@@ -1,0 +1,37 @@
+{
+  "game": {
+    "name": "骑砍环世界融合游戏",
+    "version": "0.1.0",
+    "fps": 60,
+    "debug_mode": true
+  },
+  "world": {
+    "width": 1000,
+    "height": 1000,
+    "tile_size": 32,
+    "time_scale": 1.0
+  },
+  "combat": {
+    "base_damage": 10,
+    "critical_chance": 0.1,
+    "melee_range": 50,
+    "ranged_range": 200
+  },
+  "colony": {
+    "starting_resources": {
+      "food": 100,
+      "wood": 100,
+      "stone": 50,
+      "metal": 25
+    },
+    "max_colonists": 50
+  },
+  "openai": {
+    "enabled": false,
+    "api_url": "http://localhost:8000/v1",
+    "model": "gpt-3.5-turbo",
+    "temperature": 0.7,
+    "max_tokens": 150
+  }
+}
+
