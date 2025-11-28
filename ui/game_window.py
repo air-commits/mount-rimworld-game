@@ -773,57 +773,48 @@ class GameWindow:
     
     def draw_trade(self, player, merchant):
         """绘制交易界面"""
-        # 半透明遮罩
+        # 1. 半透明背景
         self.screen.blit(self.overlay_bg, (0, 0))
         
+        # 2. 绘制主窗口框
         ww, wh = 900, 600
         wx, wy = (self.width - ww) // 2, (self.height - wh) // 2
+        pygame.draw.rect(self.screen, self.colors['dark_gray'], (wx, wy, ww, wh))
+        pygame.draw.rect(self.screen, self.colors['white'], (wx, wy, ww, wh), 2)
         
-        # 窗口背景
-        pygame.draw.rect(self.screen, (30, 30, 30), (wx, wy, ww, wh))
-        pygame.draw.rect(self.screen, (200, 200, 200), (wx, wy, ww, wh), 2)
-        
-        # 标题
+        # 3. 标题
         m_name = merchant.name if merchant else "商人"
-        self.draw_text(f"与 {m_name} 交易", self.width // 2, wy + 20, self.colors['yellow'], self.font_large, center=True)
+        self.draw_text(f"与 {m_name} 交易中", self.width // 2, wy + 20, self.colors['yellow'], self.font_large, center=True)
         
-        # 分割线
-        pygame.draw.line(self.screen, self.colors['gray'], (wx + ww // 2, wy + 80), (wx + ww // 2, wy + wh - 60), 2)
-        
-        # === 左侧：玩家 ===
+        # 4. 左右分栏
+        # 左侧：玩家
         self.draw_text("【你的背包】", wx + 100, wy + 70, self.colors['white'], self.font_medium)
         self.draw_text(f"金币: {getattr(player, 'money', 0)}", wx + 100, wy + 110, self.colors['yellow'], self.font_small)
         
+        # 显示玩家物品（前8个）
         y = wy + 150
         inv = getattr(player, 'inventory', {}) or {}
         idx = 1
-        if inv:
-            for item, data in list(inv.items())[:10]:
-                count = data.get('count', 0)
-                price = int(data.get('price', 0) * 0.7)
-                self.draw_text(f"[{idx}] {item} x{count} (卖:{price})", wx + 40, y, self.colors['white'], self.font_small)
-                y += 30
-                idx += 1
-        else:
-            self.draw_text("(背包空)", wx + 40, y, self.colors['gray'], self.font_small)
-        
-        # === 右侧：商人 ===
+        for item, data in list(inv.items())[:8]:
+            price = int(data.get('price', 0) * 0.7)
+            self.draw_text(f"[{idx}] {item} x{data.get('count',0)} (卖:{price})", wx + 40, y, self.colors['white'], self.font_small)
+            y += 30
+            idx += 1
+            
+        # 右侧：商人
         self.draw_text("【商人货物】", wx + ww - 300, wy + 70, self.colors['white'], self.font_medium)
         self.draw_text(f"资金: {getattr(merchant, 'money', 0)}", wx + ww - 300, wy + 110, self.colors['yellow'], self.font_small)
         
+        # 显示商人物品（前8个）
         y = wy + 150
         m_inv = getattr(merchant, 'inventory', {}) or {}
         idx = 1
-        if m_inv:
-            for item, data in list(m_inv.items())[:10]:
-                count = data.get('count', 0)
-                price = data.get('price', 0)
-                self.draw_text(f"[{idx}] {item} x{count} (买:{price})", wx + ww // 2 + 40, y, self.colors['white'], self.font_small)
-                y += 30
-                idx += 1
-        else:
-            self.draw_text("(无商品)", wx + ww // 2 + 40, y, self.colors['gray'], self.font_small)
-        
+        for item, data in list(m_inv.items())[:8]:
+            self.draw_text(f"[{idx}] {item} x{data.get('count',0)} (买:{data.get('price',0)})", wx + ww//2 + 40, y, self.colors['white'], self.font_small)
+            y += 30
+            idx += 1
+            
+        # 5. 底部提示
         self.draw_text("按 [1-8] 购买 | 按 [Shift+1-8] 出售 | [ESC] 离开", self.width // 2, wy + wh - 40, self.colors['light_gray'], self.font_small, center=True)
     
     def handle_events(self) -> List[pygame.event.Event]:

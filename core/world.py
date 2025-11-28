@@ -250,26 +250,17 @@ class World:
         return 0 <= position.x < self.width and 0 <= position.y < self.height
     
     def can_move_to(self, position: Position) -> bool:
-        """
-        检查是否可以移动到指定位置（考虑地形）
-        === 🔴 修复：将森林和山脉也视为障碍物 ===
-        
-        Args:
-            position: 目标位置
-            
-        Returns:
-            是否可以移动
-        """
+        """检查是否可以移动到指定位置（物理碰撞）"""
         if not self.is_valid_position(position):
             return False
         
         terrain = self.get_terrain_at(position)
-        # 水域、山脉、森林都不可移动
+        # 修复：森林和山脉现在也是障碍物
         if terrain == TerrainType.WATER:
             return False
-        if terrain == TerrainType.MOUNTAIN:
-            return False
         if terrain == TerrainType.FOREST:
+            return False
+        if terrain == TerrainType.MOUNTAIN:
             return False
         
         return True
