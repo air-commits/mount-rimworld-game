@@ -245,13 +245,13 @@ class GameWindow:
         self.screen.fill(self.colors['dark_gray'])
         
         # 计算视口范围
-        top_left_world = self.screen_to_world(0, 0)
-        bottom_right_world = self.screen_to_world(self.width, self.height)
+        tl = self.screen_to_world(0, 0)
+        br = self.screen_to_world(self.width, self.height)
         
-        start_x = max(0, int(top_left_world.x // world.tile_size) - 2)
-        end_x = min(world.width // world.tile_size, int(bottom_right_world.x // world.tile_size) + 2)
-        start_y = max(0, int(top_left_world.y // world.tile_size) - 2)
-        end_y = min(world.height // world.tile_size, int(bottom_right_world.y // world.tile_size) + 2)
+        start_x = max(0, int(tl.x // world.tile_size) - 2)
+        end_x = min(world.width // world.tile_size, int(br.x // world.tile_size) + 2)
+        start_y = max(0, int(tl.y // world.tile_size) - 2)
+        end_y = min(world.height // world.tile_size, int(br.y // world.tile_size) + 2)
         
         # 绘制地形
         for y in range(start_y, end_y):
@@ -259,51 +259,45 @@ class GameWindow:
                 # 边界检查
                 if y >= len(world.terrain_grid) or x >= len(world.terrain_grid[0]):
                     continue
-
+                
                 terrain = world.terrain_grid[y][x]
+                # 统一转小写字符串处理，防止枚举不匹配
+                t_str = str(terrain.value).lower() if hasattr(terrain, 'value') else str(terrain).lower()
                 
-                # 获取地形字符串（兼容枚举和字符串）
-                terrain_str = str(terrain.value).lower() if hasattr(terrain, 'value') else str(terrain).lower()
-                
-                # 1. 绘制背景色
-                if terrain_str == "grass": 
-                    color = self.colors['grass']
-                elif terrain_str == "forest": 
-                    color = self.colors['grass']  # 森林背景也是草地色
-                elif terrain_str == "water": 
+                # 1. 绘制背景
+                if "water" in t_str:
                     color = self.colors['water']
-                elif terrain_str == "mountain": 
+                elif "mountain" in t_str:
                     color = self.colors['mountain']
-                else: 
-                    color = self.colors['gray']
+                else:
+                    color = self.colors['grass']
                 
-                world_pos = Position(x * world.tile_size, y * world.tile_size)
-                screen_x, screen_y = self.world_to_screen(world_pos)
+                wx, wy = x * world.tile_size, y * world.tile_size
+                scx, scy = self.world_to_screen(Position(wx, wy))
                 
-                tile_rect = (int(screen_x - self.tile_size // 2), int(screen_y - self.tile_size // 2),
-                             int(self.tile_size * self.zoom), int(self.tile_size * self.zoom))
-                pygame.draw.rect(self.screen, color, tile_rect)
+                # 绘制地块
+                pygame.draw.rect(self.screen, color, (
+                    int(scx - self.tile_size // 2), int(scy - self.tile_size // 2),
+                    int(self.tile_size * self.zoom), int(self.tile_size * self.zoom)
+                ))
                 
-                # === 修复：如果是森林，绘制树木 ===
-                if "forest" in terrain_str:
-                    center = (int(screen_x), int(screen_y))
-                    radius = int(self.tile_size * 0.4 * self.zoom)
-                    # 绘制带黑边的深绿色圆
-                    pygame.draw.circle(self.screen, (0, 0, 0), center, radius + 2)
-                    pygame.draw.circle(self.screen, (0, 80, 0), center, radius)
-
-        # 绘制实体（保持原有逻辑）
-        for entity in entities:
-            if not entity.is_alive: continue
-            screen_x, screen_y = self.world_to_screen(entity.position)
-            if -50 <= screen_x <= self.width + 50 and -50 <= screen_y <= self.height + 50:
-                if isinstance(entity, Player): color, size = self.colors['blue'], 8
-                elif isinstance(entity, NPC): color, size = self.colors['green'], 6
-                else: color, size = self.colors['white'], 4
-                
-                pygame.draw.circle(self.screen, color, (int(screen_x), int(screen_y)), size)
-                if isinstance(entity, Player) or isinstance(entity, NPC):
-                    self.draw_text(entity.name, int(screen_x), int(screen_y) - 20, self.colors['white'], self.font_small, center=True)
+                # 2. 绘制障碍物 (树木/森林)
+                if "forest" in t_str:
+                    cx, cy = int(scx), int(scy)
+                    r = int(self.tile_size * 0.4 * self.zoom)
+                    pygame.draw.circle(self.screen, (0, 30, 0), (cx, cy), r + 2)  # 黑边
+                    pygame.draw.circle(self.screen, (0, 100, 0), (cx, cy), r)      # 绿树
+        
+        # 绘制实体
+        for ent in entities:
+            if not getattr(ent, 'is_alive', True):
+                continue
+            ex, ey = self.world_to_screen(ent.position)
+            if -50 < ex < self.width + 50 and -50 < ey < self.height + 50:
+                col = self.colors['blue'] if isinstance(ent, Player) else self.colors['green']
+                pygame.draw.circle(self.screen, col, (int(ex), int(ey)), 8)
+                if hasattr(ent, 'name'):
+                    self.draw_text(ent.name, int(ex), int(ey) - 20, center=True, font=self.font_small)
         
         # 绘制小地图
         if player:
@@ -778,60 +772,59 @@ class GameWindow:
                 option_y += 30
     
     def draw_trade(self, player, merchant):
-        """
-        绘制交易界面
-        
-        Args:
-            player: 玩家对象
-            merchant: 商人NPC对象
-        """
-        # 1. 绘制半透明背景
+        """绘制交易界面"""
+        # 半透明遮罩
         self.screen.blit(self.overlay_bg, (0, 0))
         
-        # 2. 绘制主窗口
-        window_width = 800
-        window_height = 600
-        window_x = (self.width - window_width) // 2
-        window_y = (self.height - window_height) // 2
+        ww, wh = 900, 600
+        wx, wy = (self.width - ww) // 2, (self.height - wh) // 2
         
-        pygame.draw.rect(self.screen, self.colors['dark_gray'], (window_x, window_y, window_width, window_height))
-        pygame.draw.rect(self.screen, self.colors['white'], (window_x, window_y, window_width, window_height), 2)
+        # 窗口背景
+        pygame.draw.rect(self.screen, (30, 30, 30), (wx, wy, ww, wh))
+        pygame.draw.rect(self.screen, (200, 200, 200), (wx, wy, ww, wh), 2)
         
-        # 3. 标题
-        self.draw_text(f"与 {merchant.name} 交易中", self.width // 2, window_y + 30, self.colors['yellow'], self.font_large, center=True)
+        # 标题
+        m_name = merchant.name if merchant else "商人"
+        self.draw_text(f"与 {m_name} 交易", self.width // 2, wy + 20, self.colors['yellow'], self.font_large, center=True)
         
-        # 4. 左侧：玩家背包
-        self.draw_text("【你的背包】", window_x + 100, window_y + 80, self.colors['white'], self.font_medium)
-        self.draw_text(f"金币: {player.money}", window_x + 100, window_y + 120, self.colors['yellow'], self.font_small)
+        # 分割线
+        pygame.draw.line(self.screen, self.colors['gray'], (wx + ww // 2, wy + 80), (wx + ww // 2, wy + wh - 60), 2)
         
-        y = window_y + 160
-        item_index = 1
-        if hasattr(player, 'inventory') and player.inventory:
-            for item, data in list(player.inventory.items())[:8]:
-                sell_price = int(data.get('price', 0) * 0.7)
-                text = f"[{item_index}] {item}: {data['count']}个 (卖出: {sell_price}G)"
-                self.draw_text(text, window_x + 50, y, self.colors['white'], self.font_small)
+        # === 左侧：玩家 ===
+        self.draw_text("【你的背包】", wx + 100, wy + 70, self.colors['white'], self.font_medium)
+        self.draw_text(f"金币: {getattr(player, 'money', 0)}", wx + 100, wy + 110, self.colors['yellow'], self.font_small)
+        
+        y = wy + 150
+        inv = getattr(player, 'inventory', {}) or {}
+        idx = 1
+        if inv:
+            for item, data in list(inv.items())[:10]:
+                count = data.get('count', 0)
+                price = int(data.get('price', 0) * 0.7)
+                self.draw_text(f"[{idx}] {item} x{count} (卖:{price})", wx + 40, y, self.colors['white'], self.font_small)
                 y += 30
-                item_index += 1
+                idx += 1
         else:
-            self.draw_text("(背包空空如也)", window_x + 50, y, self.colors['gray'], self.font_small)
-            
-        # 5. 右侧：商人货物
-        self.draw_text("【商人货物】", window_x + 500, window_y + 80, self.colors['white'], self.font_medium)
-        merchant_money = getattr(merchant, 'money', 0)
-        self.draw_text(f"持有: {merchant_money}", window_x + 500, window_y + 120, self.colors['yellow'], self.font_small)
+            self.draw_text("(背包空)", wx + 40, y, self.colors['gray'], self.font_small)
         
-        y = window_y + 160
-        item_index = 1
-        if hasattr(merchant, 'inventory') and merchant.inventory:
-            for item, data in list(merchant.inventory.items())[:8]:
-                text = f"[{item_index}] {item}: {data['count']}个 (价格: {data['price']}G)"
-                self.draw_text(text, window_x + 450, y, self.colors['white'], self.font_small)
+        # === 右侧：商人 ===
+        self.draw_text("【商人货物】", wx + ww - 300, wy + 70, self.colors['white'], self.font_medium)
+        self.draw_text(f"资金: {getattr(merchant, 'money', 0)}", wx + ww - 300, wy + 110, self.colors['yellow'], self.font_small)
+        
+        y = wy + 150
+        m_inv = getattr(merchant, 'inventory', {}) or {}
+        idx = 1
+        if m_inv:
+            for item, data in list(m_inv.items())[:10]:
+                count = data.get('count', 0)
+                price = data.get('price', 0)
+                self.draw_text(f"[{idx}] {item} x{count} (买:{price})", wx + ww // 2 + 40, y, self.colors['white'], self.font_small)
                 y += 30
-                item_index += 1
+                idx += 1
+        else:
+            self.draw_text("(无商品)", wx + ww // 2 + 40, y, self.colors['gray'], self.font_small)
         
-        # 6. 底部提示
-        self.draw_text("按 [1-8] 购买 | 按 [Shift+1-8] 出售 | [ESC] 离开", self.width // 2, window_y + window_height - 40, self.colors['light_gray'], self.font_small, center=True)
+        self.draw_text("按 [1-8] 购买 | 按 [Shift+1-8] 出售 | [ESC] 离开", self.width // 2, wy + wh - 40, self.colors['light_gray'], self.font_small, center=True)
     
     def handle_events(self) -> List[pygame.event.Event]:
         """

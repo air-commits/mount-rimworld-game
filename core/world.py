@@ -252,6 +252,7 @@ class World:
     def can_move_to(self, position: Position) -> bool:
         """
         检查是否可以移动到指定位置（考虑地形）
+        === 🔴 修复：将森林和山脉也视为障碍物 ===
         
         Args:
             position: 目标位置
@@ -263,8 +264,15 @@ class World:
             return False
         
         terrain = self.get_terrain_at(position)
-        # 水域不能直接移动
-        return terrain != TerrainType.WATER
+        # 水域、山脉、森林都不可移动
+        if terrain == TerrainType.WATER:
+            return False
+        if terrain == TerrainType.MOUNTAIN:
+            return False
+        if terrain == TerrainType.FOREST:
+            return False
+        
+        return True
     
     def get_random_position(self) -> Position:
         """
