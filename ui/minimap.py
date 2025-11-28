@@ -69,19 +69,12 @@ class Minimap:
              world, player: Player, entities: List):
         """
         绘制小地图
-        
-        Args:
-            screen: 屏幕表面
-            screen_width: 屏幕宽度
-            screen_height: 屏幕高度
-            world: 世界对象
-            player: 玩家对象
-            entities: 实体列表
         """
         if not self.visible:
             return
         
-        # === 修复：更新世界尺寸，确保坐标转换正确 ===
+        # === 修复：每次绘制时更新世界尺寸，确保坐标转换正确 ===
+        # 这样无论在大地图还是局部地图，点位都能和地形对齐
         if hasattr(world, 'width') and hasattr(world, 'height'):
             self.world_width = world.width
             self.world_height = world.height
@@ -96,7 +89,6 @@ class Minimap:
         minimap_surface.fill(self.colors['bg'])
         
         # 绘制地形（简化，只显示主要地形类型）
-        # 这里可以优化为只显示重要区域
         if hasattr(world, 'terrain_grid'):
             grid_width = len(world.terrain_grid[0]) if world.terrain_grid else 0
             grid_height = len(world.terrain_grid) if world.terrain_grid else 0
@@ -152,7 +144,7 @@ class Minimap:
         # 绘制标题
         try:
             font = pygame.font.Font(None, 20)
-            title = font.render("小地图", True, (255, 255, 255))
+            title = font.render("Minimap", True, (255, 255, 255))
             minimap_surface.blit(title, (5, 5))
         except:
             pass

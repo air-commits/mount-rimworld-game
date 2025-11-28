@@ -723,7 +723,7 @@ class GameGUI:
         Returns:
             bool: 是否触发了遭遇（True表示已触发，False表示未触发）
         """
-        # === 🔴 紧急修复：首先检查冷却时间，防止重复触发导致卡死 ===
+        # === 检查冷却时间，防止重复触发导致卡死 ===
         if self.encounter_cooldown > 0.0:
             return False
         
@@ -734,7 +734,7 @@ class GameGUI:
         encounter_radius_sq = encounter_radius ** 2  # 使用平方距离避免开方
         
         for npc in self.npcs:
-            # === 修复：只检查大地图实体（避免检查局部地图NPC） ===
+            # 只检查大地图实体（避免检查局部地图NPC）
             if not getattr(npc, 'is_world_entity', True):
                 continue
             
@@ -747,46 +747,43 @@ class GameGUI:
             dist_sq = dx ** 2 + dy ** 2
             
             if dist_sq <= encounter_radius_sq:
-                # === 🔴 紧急修复：立即设置冷却时间，防止重复触发 ===
-                self.encounter_cooldown = 3.0  # 3秒冷却时间
+                # === 触发后立即设置冷却时间（3秒），防止连续弹窗 ===
+                self.encounter_cooldown = 3.0
                 
-                # === 🔴 紧急修复：无论敌对还是中立，都执行反弹逻辑（推开30像素） ===
-                distance = dist_sq ** 0.5  # 计算实际距离
+                # === 执行反弹逻辑：将玩家推开，避免粘连 ===
+                distance = dist_sq ** 0.5
                 if distance > 0:
                     # 计算从NPC指向玩家的方向（推开方向）
-                    push_x = (dx / distance) * 30.0  # 推开30像素（增大推开距离）
+                    push_x = (dx / distance) * 30.0  # 推开30像素
                     push_y = (dy / distance) * 30.0
                     
                     # 应用推开效果
                     self.player.position.x += push_x
                     self.player.position.y += push_y
                     
-                    # 边界检查，确保不超出世界范围
-                    self.player.position.x = max(0, min(self.engine.world.width, self.player.position.x))
-                    self.player.position.y = max(0, min(self.engine.world.height, self.player.position.y))
-                    
-                    self.logger.debug(f"玩家被推开: ({push_x:.1f}, {push_y:.1f})")
+                    # 边界检查
+                    if hasattr(self.engine, 'world') and self.engine.world:
+                        self.player.position.x = max(0, min(self.engine.world.width, self.player.position.x))
+                        self.player.position.y = max(0, min(self.engine.world.height, self.player.position.y))
                 
                 # 检查NPC的势力关系
                 npc_faction = getattr(npc, 'faction', 'neutral')
-                
-                # 保存遭遇的NPC
                 self._last_encounter_npc = npc
                 
                 # 敌对势力：自动触发战斗
                 if npc_faction in ['enemy', 'bandit']:
                     self.logger.info(f"遭遇敌对军团: {npc.name} ({npc_faction})")
                     self.enter_combat_encounter(npc)
-                    return True  # 返回True表示已触发遭遇
+                    return True
                 
                 # 中立/友善势力：显示交互选项
                 elif npc_faction in ['neutral', 'alliance']:
-                    # === 修复：移除 _encounter_triggered 检查，允许重复交互 ===
+                    # === 修复：移除了 _encounter_triggered 永久锁 ===
                     # 只要过了冷却时间并再次接触，就可以再次触发对话
                     self.show_npc_encounter_dialog(npc)
-                    return True  # 返回True表示已触发遭遇
+                    return True
         
-        return False  # 未触发任何遭遇
+        return False
     
     def enter_combat_encounter(self, enemy_npc: NPC):
         """
