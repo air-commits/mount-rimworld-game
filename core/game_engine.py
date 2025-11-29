@@ -26,11 +26,18 @@ class GameEngine:
         self.config = get_config(config_path)
         
         # 初始化核心系统
+        world_width = self.config.get("world.width", 1000)
+        world_height = self.config.get("world.height", 1000)
+        tile_size = self.config.get("world.tile_size", 32)
+        self.logger.info(f"[世界] 创建游戏世界 - 尺寸: {world_width}x{world_height}, 瓦片大小: {tile_size}")
+        
         self.world = World(
-            width=self.config.get("world.width", 1000),
-            height=self.config.get("world.height", 1000),
-            tile_size=self.config.get("world.tile_size", 32)
+            width=world_width,
+            height=world_height,
+            tile_size=tile_size
         )
+        self.logger.info(f"[世界] 世界创建完成 - 地形网格: {len(self.world.terrain_grid)}x{len(self.world.terrain_grid[0]) if self.world.terrain_grid else 0}")
+        
         self.game_state = GameState()
         
         # 游戏循环控制
@@ -116,6 +123,8 @@ class GameEngine:
         Args:
             delta_time: 时间增量
         """
+        self.logger.debug(f"[引擎] 更新游戏逻辑 - 时间增量: {delta_time:.3f}s, 实体数量: {len(self.entities)}, 游戏时间: {self.game_time:.1f}s")
+        
         # 更新所有实体
         for entity in self.entities:
             if hasattr(entity, 'update'):
@@ -139,7 +148,10 @@ class GameEngine:
             entity: 实体对象
         """
         self.entities.append(entity)
-        self.logger.debug(f"添加实体: {type(entity).__name__}")
+        entity_name = getattr(entity, 'name', 'Unknown')
+        entity_pos = getattr(entity, 'position', None)
+        pos_str = f"({entity_pos.x:.1f}, {entity_pos.y:.1f})" if entity_pos else "Unknown"
+        self.logger.info(f"[实体] 添加实体到世界 - 类型: {type(entity).__name__}, 名称: {entity_name}, 位置: {pos_str}, 总实体数: {len(self.entities)}")
     
     def remove_entity(self, entity):
         """

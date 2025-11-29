@@ -4,7 +4,6 @@
 """
 
 import pygame
-import sys
 import os
 from typing import Optional, List, Dict, Tuple
 from enum import Enum
@@ -14,7 +13,7 @@ from core.locations import Location
 from entities.player import Player
 from entities.npc import NPC
 from utils.logger import get_logger
-from ui.minimap import Minimap
+# 小地图已移除，不再导入
 
 
 class GameView(Enum):
@@ -71,10 +70,7 @@ class GameWindow:
             'blue': (0, 0, 255),
             'yellow': (255, 255, 0),
             'brown': (139, 69, 19),
-            'grass': (34, 139, 34),
-            'forest': (0, 100, 0),
-            'water': (0, 119, 190),
-            'mountain': (105, 105, 105),
+            'grass': (34, 139, 34),  # 草地颜色（唯一使用）
         }
         
         # 当前视图
@@ -90,14 +86,8 @@ class GameWindow:
         # 地图瓦片大小
         self.tile_size = 32
         
-        # 选中实体
+        # 选中实体（保留用于未来功能）
         self.selected_entity = None
-        
-        # UI元素
-        self.ui_elements = []
-        
-        # 小地图
-        self.minimap = Minimap(width=200, height=200)
         
         # === 性能优化：预创建半透明蒙版，避免每帧重复创建 ===
         # 1. 全屏蒙版 (用于菜单/对话)
@@ -241,52 +231,50 @@ class GameWindow:
             self.screen.blit(text_surface, (x, y))
     
     def draw_world(self, world, entities: List, player: Player = None):
-        """绘制世界（局部地图）"""
+        """
+        绘制世界（局部地图）
+        
+        Args:
+            world: 世界对象
+            entities: 实体列表
+            player: 玩家对象（可选，用于相机跟随）
+        """
         self.screen.fill(self.colors['dark_gray'])
+        
+        # 边界检查
+        if not hasattr(world, 'terrain_grid') or not world.terrain_grid:
+            self.logger.warning("世界地形网格为空，无法绘制")
+            return
         
         # 计算视口范围
         tl = self.screen_to_world(0, 0)
         br = self.screen_to_world(self.width, self.height)
         
-        start_x = max(0, int(tl.x // world.tile_size) - 2)
-        end_x = min(world.width // world.tile_size, int(br.x // world.tile_size) + 2)
-        start_y = max(0, int(tl.y // world.tile_size) - 2)
-        end_y = min(world.height // world.tile_size, int(br.y // world.tile_size) + 2)
+        grid_width = len(world.terrain_grid[0]) if world.terrain_grid else 0
+        grid_height = len(world.terrain_grid) if world.terrain_grid else 0
         
-        # 绘制地形
+        start_x = max(0, int(tl.x // world.tile_size) - 2)
+        end_x = min(grid_width, int(br.x // world.tile_size) + 2)
+        start_y = max(0, int(tl.y // world.tile_size) - 2)
+        end_y = min(grid_height, int(br.y // world.tile_size) + 2)
+        
+        # 绘制地形（全部为白色地板瓦片）
+        tile_size_scaled = int(self.tile_size * self.zoom)
         for y in range(start_y, end_y):
             for x in range(start_x, end_x):
                 # 边界检查
-                if y >= len(world.terrain_grid) or x >= len(world.terrain_grid[0]):
+                if y >= grid_height or x >= grid_width:
                     continue
                 
-                terrain = world.terrain_grid[y][x]
-                # 统一转小写字符串处理，防止枚举不匹配
-                t_str = str(terrain.value).lower() if hasattr(terrain, 'value') else str(terrain).lower()
-                
-                # 1. 绘制背景
-                if "water" in t_str:
-                    color = self.colors['water']
-                elif "mountain" in t_str:
-                    color = self.colors['mountain']
-                else:
-                    color = self.colors['grass']
-                
+                # 计算世界坐标和屏幕坐标
                 wx, wy = x * world.tile_size, y * world.tile_size
                 scx, scy = self.world_to_screen(Position(wx, wy))
                 
-                # 绘制地块
-                pygame.draw.rect(self.screen, color, (
+                # 绘制地块（白色地板）
+                pygame.draw.rect(self.screen, (255, 255, 255), (
                     int(scx - self.tile_size // 2), int(scy - self.tile_size // 2),
-                    int(self.tile_size * self.zoom), int(self.tile_size * self.zoom)
+                    tile_size_scaled, tile_size_scaled
                 ))
-                
-                # 2. 绘制障碍物 (树木/森林)
-                if "forest" in t_str:
-                    cx, cy = int(scx), int(scy)
-                    r = int(self.tile_size * 0.4 * self.zoom)
-                    pygame.draw.circle(self.screen, (0, 30, 0), (cx, cy), r + 2)  # 黑边
-                    pygame.draw.circle(self.screen, (0, 100, 0), (cx, cy), r)      # 绿树
         
         # 绘制实体
         for ent in entities:
@@ -298,10 +286,125 @@ class GameWindow:
                 pygame.draw.circle(self.screen, col, (int(ex), int(ey)), 8)
                 if hasattr(ent, 'name'):
                     self.draw_text(ent.name, int(ex), int(ey) - 20, center=True, font=self.font_small)
+    
+    def draw_world_with_assets(self, world, entities: List, locations: List, player: Player = None, assets=None):
+        """
+        绘制世界（带素材支持）
         
-        # 绘制小地图
-        if player:
-            self.minimap.draw(self.screen, self.width, self.height, world, player, entities)
+        Args:
+            world: 世界对象
+            entities: 实体列表（玩家、NPC）
+            locations: 地点列表（城镇、村庄）
+            player: 玩家对象
+            assets: 素材库对象
+        """
+        self.screen.fill(self.colors['dark_gray'])
+        
+        # 计算视口范围
+        tl = self.screen_to_world(0, 0)
+        br = self.screen_to_world(self.width, self.height)
+        
+        start_x = max(0, int(tl.x // world.tile_size) - 2)
+        end_x = min(world.width // world.tile_size, int(br.x // world.tile_size) + 2)
+        start_y = max(0, int(tl.y // world.tile_size) - 2)
+        end_y = min(world.height // world.tile_size, int(br.y // world.tile_size) + 2)
+        
+        # 绘制地形（白色地板瓦片）
+        for y in range(start_y, end_y):
+            for x in range(start_x, end_x):
+                if y >= len(world.terrain_grid) or x >= len(world.terrain_grid[0]):
+                    continue
+                
+                # 计算世界坐标和屏幕坐标
+                wx, wy = x * world.tile_size, y * world.tile_size
+                scx, scy = self.world_to_screen(Position(wx, wy))
+                
+                # 尝试加载地图素材，没有就用白色地板
+                map_asset = assets.get_map_asset("floor") if assets else None
+                if map_asset and os.path.exists(map_asset):
+                    try:
+                        tile_img = pygame.image.load(map_asset)
+                        tile_img = pygame.transform.scale(tile_img, (int(self.tile_size * self.zoom), int(self.tile_size * self.zoom)))
+                        self.screen.blit(tile_img, (int(scx - self.tile_size // 2), int(scy - self.tile_size // 2)))
+                    except:
+                        # 加载失败，使用白色地板
+                        pygame.draw.rect(self.screen, (255, 255, 255), (
+                            int(scx - self.tile_size // 2), int(scy - self.tile_size // 2),
+                            int(self.tile_size * self.zoom), int(self.tile_size * self.zoom)
+                        ))
+                else:
+                    # 没有素材，使用白色地板
+                    pygame.draw.rect(self.screen, (255, 255, 255), (
+                        int(scx - self.tile_size // 2), int(scy - self.tile_size // 2),
+                        int(self.tile_size * self.zoom), int(self.tile_size * self.zoom)
+                    ))
+        
+        # 绘制地点（城镇、村庄）
+        for location in locations:
+            lx, ly = self.world_to_screen(location.position)
+            if -50 < lx < self.width + 50 and -50 < ly < self.height + 50:
+                # 尝试加载地点素材
+                loc_asset = assets.get_location_asset(location.name) if assets else None
+                if loc_asset and os.path.exists(loc_asset):
+                    try:
+                        loc_img = pygame.image.load(loc_asset)
+                        loc_img = pygame.transform.scale(loc_img, (32, 32))
+                        self.screen.blit(loc_img, (int(lx - 16), int(ly - 16)))
+                    except Exception as e:
+                        # 加载失败，使用黑方块
+                        self.logger.debug(f"加载地点素材失败: {e}")
+                        pygame.draw.rect(self.screen, (0, 0, 0), (int(lx - 16), int(ly - 16), 32, 32))
+                        self.draw_text(location.name, int(lx), int(ly - 25), center=True, font=self.font_small)
+                else:
+                    # 没有素材，使用黑方块
+                    pygame.draw.rect(self.screen, (0, 0, 0), (int(lx - 16), int(ly - 16), 32, 32))
+                    self.draw_text(location.name, int(lx), int(ly - 25), center=True, font=self.font_small)
+        
+        # 绘制实体（玩家、NPC）
+        for ent in entities:
+            if not getattr(ent, 'is_alive', True):
+                continue
+            ex, ey = self.world_to_screen(ent.position)
+            if -50 < ex < self.width + 50 and -50 < ey < self.height + 50:
+                # 判断是玩家还是NPC
+                if isinstance(ent, Player):
+                    # 玩家：尝试加载角色素材
+                    char_asset = assets.get_character_asset("player") if assets else None
+                    if char_asset and os.path.exists(char_asset):
+                        try:
+                            char_img = pygame.image.load(char_asset)
+                            char_img = pygame.transform.scale(char_img, (32, 32))
+                            self.screen.blit(char_img, (int(ex - 16), int(ey - 16)))
+                        except Exception as e:
+                            # 加载失败，使用黑方块
+                            self.logger.debug(f"加载角色素材失败: {e}")
+                            pygame.draw.rect(self.screen, (0, 0, 0), (int(ex - 16), int(ey - 16), 32, 32))
+                            if hasattr(ent, 'name'):
+                                self.draw_text(ent.name, int(ex), int(ey - 25), center=True, font=self.font_small)
+                    else:
+                        # 没有素材，使用黑方块
+                        pygame.draw.rect(self.screen, (0, 0, 0), (int(ex - 16), int(ey - 16), 32, 32))
+                        if hasattr(ent, 'name'):
+                            self.draw_text(ent.name, int(ex), int(ey - 25), center=True, font=self.font_small)
+                else:
+                    # NPC：尝试加载NPC素材
+                    npc_asset = assets.get_npc_asset(ent.name) if assets else None
+                    if npc_asset and os.path.exists(npc_asset):
+                        try:
+                            npc_img = pygame.image.load(npc_asset)
+                            npc_img = pygame.transform.scale(npc_img, (32, 32))
+                            self.screen.blit(npc_img, (int(ex - 16), int(ey - 16)))
+                        except Exception as e:
+                            # 加载失败，使用黑方块
+                            self.logger.debug(f"加载NPC素材失败: {e}")
+                            pygame.draw.rect(self.screen, (0, 0, 0), (int(ex - 16), int(ey - 16), 32, 32))
+                            if hasattr(ent, 'name'):
+                                self.draw_text(ent.name, int(ex), int(ey - 25), center=True, font=self.font_small)
+                    else:
+                        # 没有素材，使用黑方块
+                        pygame.draw.rect(self.screen, (0, 0, 0), (int(ex - 16), int(ey - 16), 32, 32))
+                        if hasattr(ent, 'name'):
+                            self.draw_text(ent.name, int(ex), int(ey - 25), center=True, font=self.font_small)
     
     def draw_world_map(
         self,
@@ -813,10 +916,11 @@ class GameWindow:
             self.draw_text(f"[{idx}] {item} x{data.get('count',0)} (买:{data.get('price',0)})", wx + ww//2 + 40, y, self.colors['white'], self.font_small)
             y += 30
             idx += 1
-            
+        
         # 5. 底部提示
-        self.draw_text("按 [1-8] 购买 | 按 [Shift+1-8] 出售 | [ESC] 离开", self.width // 2, wy + wh - 40, self.colors['light_gray'], self.font_small, center=True)
-    
+        self.draw_text("按 [1-8] 购买 | 按 [Shift+1-8] 出售 | [ESC] 离开", 
+                      self.width // 2, wy + wh - 40, 
+                      self.colors['light_gray'], self.font_small, center=True)
     def handle_events(self) -> List[pygame.event.Event]:
         """
         处理事件

@@ -1,0 +1,13 @@
+{
+  "player": {
+    "name": "玩家",
+    "position": {
+      "x": 194.80249404907227,
+      "y": 174.88438606262207
+    },
+    "health": 100,
+    "money": 1000
+  },
+  "game_time": 28.0380841255188,
+  "current_scene": "world_map"
+}

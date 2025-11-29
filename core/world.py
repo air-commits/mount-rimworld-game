@@ -1,279 +1,189 @@
 """
-世界系统
-管理游戏世界的地图、位置、地形等
+世界系统模块
+====================
+定义游戏世界、地形类型和位置
+
+【设计说明】
+- 所有地图都是纯草地，铺满整个地图
+- 没有障碍物，没有空气墙
+- 玩家可以在任何位置自由移动
 """
 
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
 from enum import Enum
-import random
+from typing import List
+from utils.logger import get_logger
 
 
 class TerrainType(Enum):
-    """地形类型"""
-    GRASS = "grass"          # 草地
-    FOREST = "forest"        # 森林
-    MOUNTAIN = "mountain"    # 山地
-    WATER = "water"          # 水域
-    DESERT = "desert"        # 沙漠
-    ROAD = "road"            # 道路
+    """
+    地形类型枚举类
+    ====================
+    目前只使用GRASS（草地），所有地图都是草地
+    """
+    GRASS = "grass"  # 草地（唯一使用的地形）
 
 
 @dataclass
 class Position:
-    """位置坐标"""
-    x: float
-    y: float
+    """
+    位置坐标类
+    ====================
+    表示游戏世界中的一个二维坐标点
+    
+    【属性说明】
+    - x: X坐标（浮点数，单位：像素）
+    - y: Y坐标（浮点数，单位：像素）
+    """
+    x: float  # X坐标（像素）
+    y: float  # Y坐标（像素）
     
     def distance_to(self, other: 'Position') -> float:
         """
         计算到另一个位置的距离
         
-        Args:
-            other: 目标位置
-            
-        Returns:
-            距离
-        """
-        dx = self.x - other.x
-        dy = self.y - other.y
-        return (dx ** 2 + dy ** 2) ** 0.5
-    
-    def distance_sq_to(self, other: 'Position') -> float:
-        """
-        计算到另一个位置的平方距离（性能优化，避免开方）
+        【功能说明】
+        使用欧几里得距离公式计算两点之间的距离
+        公式：√[(x1-x2)² + (y1-y2)²]
         
-        Args:
-            other: 目标位置
-            
-        Returns:
-            平方距离
+        【参数说明】
+        - other: 另一个位置对象（Position类型）
+        
+        【返回值】
+        - float: 两点之间的距离（像素）
         """
-        dx = self.x - other.x
-        dy = self.y - other.y
-        return dx ** 2 + dy ** 2
-    
-    def __add__(self, other: 'Position') -> 'Position':
-        """位置相加"""
-        return Position(self.x + other.x, self.y + other.y)
-    
-    def __sub__(self, other: 'Position') -> 'Position':
-        """位置相减"""
-        return Position(self.x - other.x, self.y - other.y)
+        # 计算X轴和Y轴的差值
+        dx = self.x - other.x  # X轴距离差
+        dy = self.y - other.y  # Y轴距离差
+        
+        # 使用勾股定理计算直线距离
+        return (dx ** 2 + dy ** 2) ** 0.5
 
 
 class World:
-    """游戏世界"""
+    """
+    游戏世界类
+    ====================
+    管理整个游戏世界，包括：
+    1. 世界尺寸（宽度、高度）
+    2. 地形网格（每个格子都是草地）
+    3. 位置验证和移动检测
+    
+    【核心概念】
+    - 世界被分成一个个小格子（瓦片），每个格子都是草地
+    - 例如：1000x1000像素的世界，32像素的瓦片 = 31x31个格子
+    - 所有格子都是草地，玩家可以在任何位置自由移动
+    """
     
     def __init__(self, width: int = 1000, height: int = 1000, tile_size: int = 32):
         """
         初始化游戏世界
         
-        Args:
-            width: 世界宽度
-            height: 世界高度
-            tile_size: 瓦片大小
-        """
-        self.width = width
-        self.height = height
-        self.tile_size = tile_size
+        【功能说明】
+        创建一个新的游戏世界，所有地形都是草地
         
-        # 地形网格（每个瓦片的地形类型）- 用于局部地图详细地形
+        【参数说明】
+        - width: 世界宽度（像素），默认1000
+        - height: 世界高度（像素），默认1000
+        - tile_size: 每个瓦片的大小（像素），默认32
+        """
+        # 初始化日志记录器
+        self.logger = get_logger("World")
+        
+        # 保存世界基本信息
+        self.width = width      # 世界宽度（像素）
+        self.height = height    # 世界高度（像素）
+        self.tile_size = tile_size  # 每个瓦片的大小（像素）
+        
+        # 计算网格大小
+        # 网格 = 世界尺寸 ÷ 瓦片大小
+        grid_width = width // tile_size   # 横向有多少个格子
+        grid_height = height // tile_size  # 纵向有多少个格子
+        
+        # 地形生成逻辑：所有格子都是草地
+        # 创建二维数组：terrain_grid[y][x] = 第y行第x列的地形类型
         self.terrain_grid: List[List[TerrainType]] = []
         
-        # 大地图简略地形网格（用于世界地图显示，分辨率较低）
-        self.global_map_grid: List[List[TerrainType]] = []
-        self.global_map_tile_size = 64  # 大地图每个瓦片代表64像素
-        
-        # 初始化地形
-        self._generate_terrain()
-        
-        # 初始化大地图地形
-        self._generate_global_map()
-    
-    def _generate_terrain(self):
-        """
-        生成世界地形（性能优化版本）
-        使用平方距离比较，避免开方运算
-        """
-        # 计算网格大小
-        grid_width = self.width // self.tile_size
-        grid_height = self.height // self.tile_size
-        
-        # 初始化地形网格（默认为草地）
-        self.terrain_grid = [
-            [TerrainType.GRASS for _ in range(grid_width)]
-            for _ in range(grid_height)
-        ]
-        
-        # 性能优化：预计算中心点和最大距离的平方（避免在循环内重复计算）
-        center_x, center_y = grid_width / 2, grid_height / 2
-        max_dist_sq = center_x ** 2 + center_y ** 2  # 最大距离的平方
-        
-        # 简单的地形生成算法（优化：使用平方距离比较）
+        # 遍历每一行，全部填充为草地
         for y in range(grid_height):
+            row = []  # 创建一行
+            # 遍历这一行的每一列，全部设置为草地
             for x in range(grid_width):
-                # 根据位置生成不同地形
-                rand = random.random()
-                
-                # 性能优化：使用平方距离比较，避免开方运算
-                dx = x - center_x
-                dy = y - center_y
-                dist_sq = dx ** 2 + dy ** 2  # 平方距离
-                
-                # 使用平方距离比例（dist_sq / max_dist_sq）代替 (dist / max_dist)
-                dist_ratio_sq = dist_sq / max_dist_sq if max_dist_sq > 0 else 0
-                
-                if rand < 0.1:
-                    self.terrain_grid[y][x] = TerrainType.WATER
-                elif rand < 0.3:
-                    self.terrain_grid[y][x] = TerrainType.FOREST
-                elif dist_ratio_sq > 0.64:  # 0.8^2 = 0.64，避免开方
-                    self.terrain_grid[y][x] = TerrainType.MOUNTAIN
-                elif rand < 0.05:
-                    self.terrain_grid[y][x] = TerrainType.DESERT
-    
-    def _generate_global_map(self):
-        """
-        生成大地图简略地形（用于世界地图显示）
-        使用较低分辨率生成，看起来像大陆地形
-        """
-        # 计算大地图网格大小（较低分辨率）
-        global_grid_width = max(1, self.width // self.global_map_tile_size)
-        global_grid_height = max(1, self.height // self.global_map_tile_size)
+                row.append(TerrainType.GRASS)  # 全部为草地
+            # 把这一行添加到网格中
+            self.terrain_grid.append(row)
         
-        # 初始化大地图网格（默认为草地）
-        self.global_map_grid = [
-            [TerrainType.GRASS for _ in range(global_grid_width)]
-            for _ in range(global_grid_height)
-        ]
-        
-        # 使用简单的噪声生成类似大陆的地形
-        center_x, center_y = global_grid_width / 2, global_grid_height / 2
-        max_dist_sq = (center_x ** 2 + center_y ** 2) if (center_x ** 2 + center_y ** 2) > 0 else 1
-        
-        # 设置随机种子以获得一致的地形
-        random.seed(42)  # 固定种子，确保每次生成相同的地形
-        
-        for y in range(global_grid_height):
-            for x in range(global_grid_width):
-                # 计算到中心的距离（用于生成中心为陆地，边缘为水域的地形）
-                dx = x - center_x
-                dy = y - center_y
-                dist_sq = dx ** 2 + dy ** 2
-                dist_ratio = dist_sq / max_dist_sq
-                
-                # 使用噪声函数（简化版）
-                noise_x = x / max(global_grid_width, 1) * 3.0
-                noise_y = y / max(global_grid_height, 1) * 3.0
-                noise_value = (random.random() + random.random() + random.random()) / 3.0
-                
-                # 地形生成规则
-                if dist_ratio > 0.85:  # 边缘区域：水域
-                    self.global_map_grid[y][x] = TerrainType.WATER
-                elif dist_ratio > 0.70:  # 外围区域：混合（20%水域）
-                    if random.random() < 0.2:
-                        self.global_map_grid[y][x] = TerrainType.WATER
-                    else:
-                        self.global_map_grid[y][x] = TerrainType.GRASS
-                elif noise_value < 0.15:  # 低洼地区：水域（形成河流/湖泊）
-                    self.global_map_grid[y][x] = TerrainType.WATER
-                elif noise_value > 0.85:  # 高地区域：山脉
-                    self.global_map_grid[y][x] = TerrainType.MOUNTAIN
-                elif noise_value > 0.70:  # 中等高度：森林
-                    self.global_map_grid[y][x] = TerrainType.FOREST
-                else:
-                    # 大部分区域是草地
-                    self.global_map_grid[y][x] = TerrainType.GRASS
-        
-        # 恢复随机种子
-        random.seed()
-    
-    def get_global_terrain_at(self, position: Position) -> TerrainType:
-        """
-        获取大地图指定位置的简略地形类型
-        
-        Args:
-            position: 位置坐标
-            
-        Returns:
-            地形类型
-        """
-        if not self.global_map_grid:
-            return TerrainType.GRASS
-        
-        grid_x = int(position.x // self.global_map_tile_size)
-        grid_y = int(position.y // self.global_map_tile_size)
-        
-        # 边界检查
-        grid_height = len(self.global_map_grid)
-        grid_width = len(self.global_map_grid[0]) if grid_height > 0 else 0
-        
-        if 0 <= grid_y < grid_height and 0 <= grid_x < grid_width:
-            return self.global_map_grid[grid_y][grid_x]
-        return TerrainType.GRASS
-    
-    def get_terrain_at(self, position: Position) -> TerrainType:
-        """
-        获取指定位置的地形类型
-        
-        Args:
-            position: 位置坐标
-            
-        Returns:
-            地形类型
-        """
-        if not self.is_valid_position(position):
-            return TerrainType.GRASS
-        
-        grid_x = int(position.x // self.tile_size)
-        grid_y = int(position.y // self.tile_size)
-        
-        # 边界检查
-        grid_height = len(self.terrain_grid)
-        grid_width = len(self.terrain_grid[0]) if grid_height > 0 else 0
-        
-        if 0 <= grid_y < grid_height and 0 <= grid_x < grid_width:
-            return self.terrain_grid[grid_y][grid_x]
-        return TerrainType.GRASS
+        # 记录日志
+        self.logger.info(
+            f"[世界] 创建世界 - 尺寸: {width}x{height}, "
+            f"瓦片大小: {tile_size}, 网格: {grid_width}x{grid_height}, "
+            f"全部为草地"
+        )
     
     def is_valid_position(self, position: Position) -> bool:
         """
         检查位置是否在世界范围内
         
-        Args:
-            position: 位置坐标
-            
-        Returns:
-            是否有效
+        【功能说明】
+        判断一个坐标点是否在世界地图的边界内
+        
+        【参数说明】
+        - position: 要检查的位置坐标（Position对象）
+        
+        【返回值】
+        - bool: True表示位置有效（在世界内），False表示位置无效（超出边界）
         """
-        return 0 <= position.x < self.width and 0 <= position.y < self.height
+        # 检查X坐标：必须在 [0, width) 范围内
+        x_valid = 0 <= position.x < self.width
+        # 检查Y坐标：必须在 [0, height) 范围内
+        y_valid = 0 <= position.y < self.height
+        # 两个坐标都有效，位置才有效
+        return x_valid and y_valid
+    
+    def get_terrain_at(self, position: Position) -> TerrainType:
+        """
+        获取指定位置的地形类型
+        
+        【功能说明】
+        根据世界坐标（像素），找到对应的格子，返回该格子的地形类型
+        
+        【参数说明】
+        - position: 世界坐标（Position对象，单位：像素）
+        
+        【返回值】
+        - TerrainType: 该位置的地形类型（当前总是GRASS）
+        """
+        # 检查位置是否有效
+        if not self.is_valid_position(position):
+            return TerrainType.GRASS
+        
+        # 将像素坐标转换为格子坐标
+        grid_x = int(position.x // self.tile_size)  # 列索引
+        grid_y = int(position.y // self.tile_size)  # 行索引
+        
+        # 从地形网格中获取地形类型
+        if (grid_y < len(self.terrain_grid) and 
+            grid_x < len(self.terrain_grid[0])):
+            return self.terrain_grid[grid_y][grid_x]
+        
+        # 如果超出网格范围，返回默认值（草地）
+        return TerrainType.GRASS
     
     def can_move_to(self, position: Position) -> bool:
-        """检查是否可以移动到指定位置（物理碰撞）"""
-        if not self.is_valid_position(position):
-            return False
-        
-        terrain = self.get_terrain_at(position)
-        # 修复：森林和山脉现在也是障碍物
-        if terrain == TerrainType.WATER:
-            return False
-        if terrain == TerrainType.FOREST:
-            return False
-        if terrain == TerrainType.MOUNTAIN:
-            return False
-        
-        return True
-    
-    def get_random_position(self) -> Position:
         """
-        获取世界内的随机位置
+        检查是否可以移动到指定位置
         
-        Returns:
-            随机位置
+        【功能说明】
+        判断玩家是否可以移动到目标位置
+        当前所有地形都是草地，所以只要在世界范围内就可以移动
+        
+        【参数说明】
+        - position: 目标位置（Position对象，单位：像素）
+        
+        【返回值】
+        - bool: True表示可以移动，False表示超出边界
         """
-        return Position(
-            random.uniform(0, self.width),
-            random.uniform(0, self.height)
-        )
+        # 检查位置是否在世界范围内
+        # 所有地形都是草地，都可以通行，只需要检查边界
+        return self.is_valid_position(position)
 
