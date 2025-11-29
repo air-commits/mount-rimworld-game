@@ -6,8 +6,10 @@
 """
 
 import os
-import pygame
+import sys
+import time
 import json
+import pygame
 from typing import Optional, Dict, Any
 
 # 添加项目根目录到Python路径
@@ -80,7 +82,16 @@ class GameGUI:
         self.logger.info("游戏GUI初始化完成（优化版）")
     
     def save_state(self) -> Dict[str, Any]:
-        """保存当前游戏状态到文件"""
+        """
+        保存当前游戏状态到文件
+        
+        【功能说明】
+        - 将玩家数据、游戏时间、当前场景等信息保存到JSON文件
+        - 用于界面切换时保存状态，切换回来后可以恢复
+        
+        Returns:
+            Dict[str, Any]: 保存的游戏状态字典
+        """
         self.logger.info("保存游戏状态到文件")
         
         state = {
@@ -108,7 +119,16 @@ class GameGUI:
         return state
     
     def load_state(self) -> Optional[Dict[str, Any]]:
-        """从文件加载游戏状态"""
+        """
+        从文件加载游戏状态
+        
+        【功能说明】
+        - 从JSON文件读取之前保存的游戏状态
+        - 如果文件不存在或读取失败，返回None
+        
+        Returns:
+            Optional[Dict[str, Any]]: 游戏状态字典，如果加载失败返回None
+        """
         if not os.path.exists(self.save_file):
             self.logger.info("没有找到保存的游戏状态文件")
             return None
@@ -123,7 +143,16 @@ class GameGUI:
             return None
     
     def restore_state(self, saved_state: Dict[str, Any]):
-        """恢复游戏状态"""
+        """
+        恢复游戏状态
+        
+        【功能说明】
+        - 从保存的状态字典中恢复玩家数据、游戏时间、场景等信息
+        - 在从其他界面返回主地图时调用
+        
+        Args:
+            saved_state: 保存的游戏状态字典
+        """
         self.logger.info("恢复游戏状态")
         
         if not saved_state:
@@ -151,7 +180,16 @@ class GameGUI:
         self.logger.info("游戏状态恢复完成")
     
     def initialize_world(self):
-        """初始化游戏世界（20x20地图）"""
+        """
+        初始化游戏世界（20x20地图）
+        
+        【功能说明】
+        - 创建20x20瓦片的地图（640x640像素）
+        - 在地图中心创建玩家
+        - 在玩家附近生成1个城镇、1个村庄
+        - 在玩家附近生成3个NPC（中立、友好、敌对各1个）
+        - 设置相机跟随玩家
+        """
         self.logger.info("初始化游戏世界（20x20地图）...")
         
         # 创建20x20地图
@@ -219,7 +257,14 @@ class GameGUI:
         self.logger.info("游戏世界初始化完成")
     
     def start(self):
-        """启动游戏"""
+        """
+        启动游戏
+        
+        【功能说明】
+        - 初始化游戏世界
+        - 开始游戏主循环
+        - 这是游戏的入口点
+        """
         self.logger.info("=" * 50)
         self.logger.info("骑砍环世界融合游戏（优化版）启动")
         self.logger.info("=" * 50)
@@ -232,7 +277,20 @@ class GameGUI:
         self.game_loop()
     
     def game_loop(self):
-        """游戏主循环"""
+        """
+        游戏主循环
+        
+        【功能说明】
+        - 游戏的核心循环，每帧执行以下操作：
+          1. 计算时间差（delta_time）
+          2. 更新游戏时间（如果未暂停）
+          3. 处理事件（键盘、鼠标）
+          4. 更新游戏逻辑（如果未暂停）
+          5. 绘制画面
+          6. 更新显示
+        - 限制帧率为60FPS
+        - 异常处理和状态保存
+        """
         clock = pygame.time.Clock()
         last_time = time.time()
         
@@ -273,7 +331,14 @@ class GameGUI:
             self.quit()
     
     def handle_events(self):
-        """处理事件"""
+        """
+        处理Pygame事件
+        
+        【功能说明】
+        - 处理窗口关闭事件（QUIT）
+        - 处理键盘按下事件（KEYDOWN）
+        - 处理鼠标点击事件（MOUSEBUTTONDOWN/UP）
+        """
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -288,13 +353,31 @@ class GameGUI:
                 self.mouse_clicked = False
     
     def handle_keydown(self, key: int, mod: int):
-        """处理按键"""
+        """
+        处理键盘按键事件
+        
+        Args:
+            key: 按键代码（pygame.K_*）
+            mod: 修饰键（Shift、Ctrl等）
+        
+        【当前支持的按键】
+        - ESC: 暂停/取消暂停游戏
+        """
         # ESC: 暂停/取消暂停
         if key == pygame.K_ESCAPE:
             self.paused = not self.paused
     
     def handle_mouse_click(self, pos: tuple):
-        """处理鼠标点击（底部按钮）"""
+        """
+        处理鼠标点击事件（主要用于底部按钮）
+        
+        Args:
+            pos: 鼠标点击位置 (x, y)
+        
+        【功能说明】
+        - 检测点击是否在底部按钮区域内
+        - 如果点击了按钮，调用 handle_button_click() 处理
+        """
         button_y = self.window.height - 60
         button_height = 50
         button_width = 140
@@ -320,7 +403,20 @@ class GameGUI:
                 break
     
     def handle_button_click(self, action: str):
-        """处理按钮点击"""
+        """
+        处理底部按钮点击事件
+        
+        Args:
+            action: 按钮动作名称（"pause", "settings", "inventory"等）
+        
+        【支持的按钮动作】
+        - pause: 暂停/继续游戏
+        - settings: 切换到设置界面
+        - inventory: 切换到背包界面
+        - army: 切换到军队界面
+        - nation: 切换到国家界面
+        - relations: 切换到关系界面
+        """
         if action == "pause":
             self.paused = not self.paused
             self.logger.info(f"游戏{'暂停' if self.paused else '继续'}")
@@ -336,7 +432,18 @@ class GameGUI:
             self.switch_to_interface("relations")
     
     def switch_to_interface(self, interface_name: str):
-        """切换到指定界面"""
+        """
+        切换到指定的功能界面
+        
+        Args:
+            interface_name: 界面名称（"settings", "inventory", "army"等）
+        
+        【功能说明】
+        - 保存当前游戏状态
+        - 创建并运行对应的界面主程序
+        - 界面返回后恢复游戏状态
+        - 恢复相机跟随玩家
+        """
         self.logger.info(f"切换到{interface_name}界面")
         saved_state = self.save_state()
         
@@ -369,7 +476,19 @@ class GameGUI:
             self.logger.error(traceback.format_exc())
     
     def draw_bottom_buttons(self):
-        """绘制底部按钮栏"""
+        """
+        绘制底部按钮栏
+        
+        【功能说明】
+        - 在窗口底部绘制6个功能按钮：
+          1. 设置
+          2. 暂停/开始
+          3. 背包
+          4. 军队
+          5. 国家
+          6. 关系
+        - 按钮居中排列，带边框和文字
+        """
         button_y = self.window.height - 60
         button_height = 50
         button_width = 140
@@ -400,7 +519,19 @@ class GameGUI:
             self.window.screen.blit(button_text, text_rect)
     
     def update(self, delta_time: float):
-        """更新游戏逻辑"""
+        """
+        更新游戏逻辑
+        
+        Args:
+            delta_time: 上一帧到这一帧的时间差（秒）
+        
+        【功能说明】
+        - 处理玩家移动（WASD/方向键）
+        - 检测地图边界（空气墙）
+        - 检查地形碰撞
+        - 更新游戏引擎
+        - 相机跟随玩家
+        """
         if not self.player:
             return
         
@@ -443,7 +574,14 @@ class GameGUI:
         self.engine.update(delta_time)
     
     def draw(self):
-        """绘制游戏"""
+        """
+        绘制游戏画面
+        
+        【功能说明】
+        - 根据当前视图模式绘制不同的内容
+        - WORLD视图：绘制地图、实体、地点、HUD、底部按钮
+        - 使用素材库加载资源，如果没有素材则使用默认图形
+        """
         if self.current_view == GameView.WORLD:
             if self.engine.world and self.player:
                 # 收集所有实体（玩家、NPC、地点）
@@ -463,14 +601,27 @@ class GameGUI:
                 self.draw_bottom_buttons()
     
     def quit(self):
-        """退出游戏"""
+        """
+        退出游戏
+        
+        【功能说明】
+        - 关闭Pygame窗口
+        - 记录日志
+        - 在 game_loop() 的 finally 块中调用
+        """
         self.logger.info("游戏窗口已关闭")
         self.logger.info("游戏结束")
         pygame.quit()
 
 
 def main():
-    """主函数"""
+    """
+    主函数（程序入口点）
+    
+    【使用方式】
+    运行此文件即可启动游戏：
+        python game_gui_optimized.py
+    """
     game = GameGUI()
     game.start()
 

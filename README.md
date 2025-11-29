@@ -1,164 +1,18 @@
 # 骑砍环世界融合游戏
 
-## 项目简介
+## 📖 项目简介
 
-这是一个基于 Pygame 开发的图形界面游戏，融合了《骑马与砍杀》和《环世界》的游戏元素。游戏采用模块化架构，支持大地图探索、NPC交互、城镇管理等功能。
+这是一个基于 Pygame 开发的图形界面游戏，融合了《骑马与砍杀》和《环世界》的游戏元素。
 
-## 项目结构
+## 🎮 游戏特性
 
-```
-mount_rimworld_game/
-│
-├── 【主程序文件】
-│   ├── game_gui_optimized.py    # 主游戏控制器（20x20地图，玩家移动）
-│   ├── base_main.py             # 界面基类（所有独立界面的基类）
-│   └── assets_library.py        # 素材库（管理所有游戏素材资源）
-│
-├── 【功能界面（独立main）】
-│   ├── settings_main.py         # 设置界面
-│   ├── inventory_main.py          # 背包界面
-│   ├── army_main.py            # 军队界面
-│   ├── nation_main.py          # 国家界面
-│   ├── relations_main.py       # 关系界面
-│   └── minimap_main.py         # 小地图界面
-│
-├── 【核心系统】
-│   ├── core/                    # 核心游戏系统
-│   │   ├── world.py            # 世界系统（地图、地形、位置）
-│   │   ├── game_engine.py      # 游戏引擎（核心循环、实体管理）
-│   │   ├── game_state.py       # 游戏状态管理
-│   │   └── locations.py        # 地点系统（城镇、村庄等）
-│   │
-│   ├── entities/                # 实体系统
-│   │   ├── character.py        # 角色基类
-│   │   ├── player.py           # 玩家角色
-│   │   └── npc.py              # NPC角色
-│   │
-│   ├── ui/                      # UI系统
-│   │   └── game_window.py      # 游戏窗口（Pygame图形界面）
-│   │
-│   └── utils/                   # 工具系统
-│       ├── logger.py           # 日志系统
-│       └── config.py           # 配置管理
-│
-├── 【扩展系统】
-│   ├── ai/                      # AI系统
-│   │   ├── npc_ai.py           # NPC AI逻辑
-│   │   └── openai_integration.py  # OpenAI集成（可选）
-│   │
-│   ├── combat/                  # 战斗系统
-│   │   ├── combat_engine.py    # 战斗引擎
-│   │   ├── weapons.py          # 武器系统
-│   │   └── skills.py           # 技能系统
-│   │
-│   ├── colony/                   # 基地系统
-│   │   ├── resource.py         # 资源管理
-│   │   ├── building.py         # 建筑系统
-│   │   └── production.py       # 生产系统
-│   │
-│   └── systems/                 # 游戏系统
-│       ├── quest.py            # 任务系统
-│       └── event.py            # 事件系统
-│
-├── 【配置文件】
-│   ├── config.json              # 游戏配置文件
-│   ├── requirements.txt        # Python依赖包列表
-│   └── game_state.json         # 游戏状态保存文件（自动生成）
-│
-└── 【文档和日志】
-    ├── docs/                    # 文档目录
-    │   └── PROJECT_STRUCTURE.md  # 项目结构文档
-    └── logs/                    # 日志文件目录
-```
+- **20x20 地图系统**：简洁的地图设计，专注于游戏玩法
+- **多界面系统**：设置、背包、军队、国家、关系等独立界面
+- **状态保存/恢复**：支持游戏状态保存和恢复
+- **素材库系统**：集中管理游戏资源
+- **模块化设计**：代码结构清晰，易于扩展
 
-## 核心文件说明
-
-### 主程序文件
-
-#### `game_gui_optimized.py`
-- **功能**：主游戏控制器
-- **职责**：
-  - 初始化游戏世界（20x20地图）
-  - 生成玩家、NPC、城镇、村庄
-  - 处理玩家移动和输入
-  - 管理界面切换（设置、背包、军队等）
-  - 保存/恢复游戏状态
-- **关键方法**：
-  - `initialize_world()`: 初始化游戏世界
-  - `save_state()`: 保存游戏状态
-  - `restore_state()`: 恢复游戏状态
-  - `switch_to_interface()`: 切换到功能界面
-
-#### `base_main.py`
-- **功能**：所有独立界面主程序的基类
-- **职责**：
-  - 提供通用功能（字体加载、事件处理、基本绘制）
-  - 统一界面风格和行为
-  - 减少代码重复
-- **关键方法**：
-  - `_load_font()`: 加载中文字体
-  - `handle_events()`: 处理事件（ESC退出）
-  - `draw()`: 基本绘制（背景、标题、提示）
-  - `run()`: 游戏循环
-
-#### `assets_library.py`
-- **功能**：素材库管理器
-- **职责**：
-  - 存储地图素材路径
-  - 存储NPC素材路径
-  - 存储角色素材路径
-  - 存储地点素材路径
-- **关键方法**：
-  - `get_map_asset()`: 获取地图素材
-  - `get_npc_asset()`: 获取NPC素材
-  - `get_character_asset()`: 获取角色素材
-  - `get_location_asset()`: 获取地点素材
-
-### 功能界面文件
-
-所有 `*_main.py` 文件都是独立的界面模块：
-- 继承自 `BaseMain` 基类
-- 接收游戏状态数据
-- 显示对应功能界面
-- 返回更新后的游戏状态
-- 支持中文显示
-
-### 核心系统文件
-
-#### `core/world.py`
-- **功能**：世界系统
-- **职责**：
-  - 定义世界地图、地形类型
-  - 位置坐标系统
-  - 地形碰撞检测
-
-#### `core/game_engine.py`
-- **功能**：游戏引擎
-- **职责**：
-  - 游戏主循环
-  - 实体更新和管理
-  - 系统管理
-
-#### `entities/player.py`
-- **功能**：玩家角色
-- **职责**：
-  - 玩家属性（生命值、金币、声望等）
-  - 玩家行为
-
-#### `entities/npc.py`
-- **功能**：NPC角色
-- **职责**：
-  - NPC属性（性格、关系等）
-  - NPC行为
-
-#### `ui/game_window.py`
-- **功能**：游戏窗口
-- **职责**：
-  - 所有图形渲染
-  - 窗口管理
-  - UI绘制
-
-## 快速开始
+## 🚀 快速开始
 
 ### 安装依赖
 
@@ -172,40 +26,76 @@ pip install -r requirements.txt
 python game_gui_optimized.py
 ```
 
-### 操作说明
+## 🎯 操作说明
 
+### 基本操作
 - **WASD / 方向键**：移动玩家
 - **ESC**：暂停/返回
-- **底部按钮**：切换到功能界面（设置、背包、军队、国家、关系）
-- **M键**：切换到小地图
+- **鼠标点击**：点击底部按钮切换界面
 
-## 开发说明
+### 界面切换
+- **设置**：游戏设置界面
+- **暂停/开始**：暂停或继续游戏
+- **背包**：查看和管理物品
+- **军队**：管理军队单位
+- **国家**：管理国家资源
+- **关系**：查看和管理NPC关系
+
+## 📁 项目结构
+
+```
+mount_rimworld_game/
+├── game_gui_optimized.py    # 游戏主控制器（启动入口）
+├── base_main.py              # 界面基类
+├── assets_library.py         # 素材库
+├── settings_main.py          # 设置界面
+├── inventory_main.py         # 背包界面
+├── army_main.py              # 军队界面
+├── nation_main.py            # 国家界面
+├── relations_main.py         # 关系界面
+├── minimap_main.py           # 小地图界面
+├── core/                     # 核心游戏系统
+├── entities/                 # 实体系统
+├── ui/                       # 用户界面系统
+├── utils/                    # 工具系统
+└── docs/                     # 项目文档
+```
+
+## 📚 文档
+
+- [项目结构说明](docs/PROJECT_STRUCTURE.md) - 详细的项目结构介绍
+- [文件介绍](docs/FILES_INTRODUCTION.md) - 所有文件的详细说明
+
+## 🛠️ 开发说明
 
 ### 添加新功能界面
 
 1. 创建新的 `*_main.py` 文件
-2. 继承 `BaseMain` 基类
-3. 重写 `draw()` 方法实现自定义界面
-4. 在 `game_gui_optimized.py` 的 `switch_to_interface()` 中添加切换逻辑
-5. 在 `draw_bottom_buttons()` 中添加新按钮
+2. 继承 `BaseMain` 类
+3. 重写 `draw()` 方法实现界面绘制
+4. 在 `game_gui_optimized.py` 中添加切换逻辑
 
 ### 添加素材
 
 1. 在 `assets_library.py` 中添加素材路径
-2. 在 `ui/game_window.py` 的 `draw_world_with_assets()` 中使用素材
+2. 在 `ui/game_window.py` 中使用素材
 
-### 修改地图
+## 📝 代码规范
 
-1. 修改 `core/world.py` 的地形生成逻辑
-2. 修改 `game_gui_optimized.py` 的地图尺寸和生成逻辑
+- 所有代码都有详细的中文注释
+- 遵循 PEP 8 代码风格
+- 使用类型提示（Type Hints）
+- 模块化设计，易于维护
 
-## 技术栈
-
-- **Python 3.8+**
-- **Pygame 2.6+**
-- **JSON**（配置文件和数据存储）
-
-## 许可证
+## 📄 许可证
 
 本项目仅供学习和研究使用。
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+---
+
+**注意**：本项目仍在开发中，部分功能可能不完整。
 
